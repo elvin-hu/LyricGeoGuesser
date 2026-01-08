@@ -17,7 +17,6 @@ export default function GamePage() {
 
     const [gameState, setGameState] = useState('loading');
     const [questions, setQuestions] = useState([]);
-    const [pendingSongs, setPendingSongs] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [currentPhrase, setCurrentPhrase] = useState(null);
     const [guess, setGuess] = useState(null);
@@ -26,14 +25,15 @@ export default function GamePage() {
 
     const countdownRef = useRef(null);
     const gameStateRef = useRef(gameState);
-    const questionKeyRef = useRef(0); // Unique key per question to prevent stale closures
+    const questionKeyRef = useRef(0);
+    const usedSongsRef = useRef(new Set()); // Track used songs with ref to avoid stale state
+    const pendingSongsRef = useRef([]); // Use ref for pending songs too
+    const isLoadingRef = useRef(false); // Prevent concurrent loading
 
-    // Keep refs in sync
     useEffect(() => {
         gameStateRef.current = gameState;
     }, [gameState]);
 
-    // Clear any existing timer
     const clearTimer = useCallback(() => {
         if (countdownRef.current) {
             clearInterval(countdownRef.current);
@@ -41,13 +41,11 @@ export default function GamePage() {
         }
     }, []);
 
-    // Start a fresh timer for current question
     const startTimer = useCallback(() => {
         clearTimer();
         const questionKey = questionKeyRef.current;
 
         countdownRef.current = setInterval(() => {
-            // Check if we're still on the same question and still playing
             if (questionKey !== questionKeyRef.current || gameStateRef.current !== 'playing') {
                 return;
             }
@@ -55,7 +53,6 @@ export default function GamePage() {
             setCountdown(prev => {
                 if (prev <= 1) {
                     clearTimer();
-                    // Trigger timeout via state change, not direct call
                     setGameState('timeout');
                     return 0;
                 }
@@ -63,6 +60,38 @@ export default function GamePage() {
             });
         }, 1000);
     }, [clearTimer]);
+
+    // Load a single question from pending songs
+    const loadOneQuestion = useCallback(async () => {
+        if (isLoadingRef.current) return null;
+        isLoadingRef.current = true;
+
+        try {
+            while (pendingSongsRef.current.length > 0) {
+                const song = pendingSongsRef.current.shift(); // Take from front
+
+                // Skip if already used
+                if (usedSongsRef.current.has(song.title)) {
+                    continue;
+                }
+
+                const lyrics = await fetchLyrics(artist.name, song.title, song.album, song.duration);
+
+                if (lyrics) {
+                    const phrase = selectRandomPhrase(lyrics);
+                    if (phrase) {
+                        usedSongsRef.current.add(song.title); // Mark as used
+                        isLoadingRef.current = false;
+                        return { song, phrase, lyrics };
+                    }
+                }
+            }
+        } finally {
+            isLoadingRef.current = false;
+        }
+
+        return null;
+    }, [artist]);
 
     // Initialize game
     useEffect(() => {
@@ -72,44 +101,34 @@ export default function GamePage() {
         }
 
         const initGame = async () => {
-            const songs = getRandomSongs(artistId, QUESTIONS_PER_ROUND + 5);
-            let firstQuestion = null;
-            let remaining = [];
+            // Reset refs
+            usedSongsRef.current = new Set();
+            pendingSongsRef.current = [...getRandomSongs(artistId, 25)]; // Get 25 songs
+            isLoadingRef.current = false;
 
-            for (let i = 0; i < songs.length; i++) {
-                const song = songs[i];
-                const lyrics = await fetchLyrics(artist.name, song.title, song.album, song.duration);
-
-                if (lyrics) {
-                    const phrase = selectRandomPhrase(lyrics);
-                    if (phrase) {
-                        firstQuestion = { song, phrase, lyrics };
-                        remaining = songs.slice(i + 1);
-                        break;
-                    }
-                }
-            }
+            // Load first question
+            const firstQuestion = await loadOneQuestion();
 
             if (!firstQuestion) {
                 navigate('/');
                 return;
             }
 
+            // Prefetch remaining songs in background
+            prefetchSongs(artist.name, pendingSongsRef.current.slice(0, 5));
+
             setQuestions([firstQuestion]);
-            setPendingSongs(remaining);
             setCurrentPhrase(firstQuestion.phrase);
             setGuess(null);
             setCountdown(COUNTDOWN_SECONDS);
             questionKeyRef.current = 1;
             setGameState('playing');
-
-            prefetchSongs(artist.name, remaining);
         };
 
         initGame();
 
         return () => clearTimer();
-    }, [artist, artistId, navigate, clearTimer]);
+    }, [artist, artistId, navigate, clearTimer, loadOneQuestion]);
 
     // Start/stop timer based on game state
     useEffect(() => {
@@ -127,7 +146,6 @@ export default function GamePage() {
         const question = questions[currentIndex];
         if (!question) return;
 
-        // Record 0 points for timeout
         setResults(prev => [...prev, {
             song: question.song.title,
             guess: null,
@@ -135,14 +153,13 @@ export default function GamePage() {
             points: 0
         }]);
 
-        // Move to next question
         moveToNextQuestion();
     }, [gameState]);
 
-    const moveToNextQuestion = useCallback(() => {
+    const moveToNextQuestion = useCallback(async () => {
         const nextIndex = currentIndex + 1;
 
-        if (nextIndex >= QUESTIONS_PER_ROUND || (nextIndex >= questions.length && pendingSongs.length === 0)) {
+        if (nextIndex >= QUESTIONS_PER_ROUND) {
             // Game complete
             setTimeout(() => {
                 const totalScore = results.reduce((sum, r) => sum + r.points, 0);
@@ -158,61 +175,63 @@ export default function GamePage() {
             return;
         }
 
-        if (nextIndex >= questions.length) {
+        // Check if we have the next question ready
+        if (nextIndex < questions.length) {
+            questionKeyRef.current += 1;
+            setCurrentIndex(nextIndex);
+            setCurrentPhrase(questions[nextIndex].phrase);
+            setGuess(null);
+            setCountdown(COUNTDOWN_SECONDS);
+            setGameState('playing');
+        } else {
+            // Need to load next question
             setGameState('loading');
             setCurrentIndex(nextIndex);
-            return;
-        }
 
-        questionKeyRef.current += 1;
-        setCurrentIndex(nextIndex);
-        setCurrentPhrase(questions[nextIndex].phrase);
-        setGuess(null);
-        setCountdown(COUNTDOWN_SECONDS);
-        setGameState('playing');
-    }, [currentIndex, questions, pendingSongs, results, navigate, artistId, artist]);
+            const nextQuestion = await loadOneQuestion();
 
-    // Load more questions in background
-    useEffect(() => {
-        if (questions.length >= QUESTIONS_PER_ROUND) return;
-        if (pendingSongs.length === 0) return;
-
-        const loadNextQuestion = async () => {
-            // Get titles of songs already used
-            const usedTitles = new Set(questions.map(q => q.song.title));
-
-            for (let i = 0; i < pendingSongs.length; i++) {
-                const song = pendingSongs[i];
-
-                // Skip if song already used
-                if (usedTitles.has(song.title)) {
-                    setPendingSongs(prev => prev.filter((_, idx) => idx !== i));
-                    continue;
-                }
-
-                const lyrics = await fetchLyrics(artist.name, song.title, song.album, song.duration);
-
-                if (lyrics) {
-                    const phrase = selectRandomPhrase(lyrics);
-                    if (phrase) {
-                        setQuestions(prev => {
-                            // Double-check we haven't already added this song
-                            if (prev.some(q => q.song.title === song.title)) return prev;
-                            if (prev.length >= QUESTIONS_PER_ROUND) return prev;
-                            return [...prev, { song, phrase, lyrics }];
-                        });
-                        setPendingSongs(prev => prev.filter((_, idx) => idx !== i));
-                        return;
+            if (nextQuestion) {
+                setQuestions(prev => [...prev, nextQuestion]);
+                questionKeyRef.current += 1;
+                setCurrentPhrase(nextQuestion.phrase);
+                setGuess(null);
+                setCountdown(COUNTDOWN_SECONDS);
+                setGameState('playing');
+            } else {
+                // No more songs available, end game early
+                const totalScore = results.reduce((sum, r) => sum + r.points, 0);
+                navigate('/results', {
+                    state: {
+                        artistId,
+                        artistName: artist.name,
+                        score: totalScore,
+                        results: results
                     }
-                }
-                setPendingSongs(prev => prev.filter((_, idx) => idx !== i));
+                });
+            }
+        }
+    }, [currentIndex, questions, results, navigate, artistId, artist, loadOneQuestion]);
+
+    // Preload next question while user is playing
+    useEffect(() => {
+        if (gameState !== 'playing' && gameState !== 'answered') return;
+        if (questions.length >= QUESTIONS_PER_ROUND) return;
+        if (questions.length > currentIndex + 1) return; // Already have next question
+
+        const preloadNext = async () => {
+            const nextQuestion = await loadOneQuestion();
+            if (nextQuestion) {
+                setQuestions(prev => {
+                    // Check we haven't already added this
+                    if (prev.some(q => q.song.title === nextQuestion.song.title)) return prev;
+                    if (prev.length >= QUESTIONS_PER_ROUND) return prev;
+                    return [...prev, nextQuestion];
+                });
             }
         };
 
-        if (questions.length < currentIndex + 3) {
-            loadNextQuestion();
-        }
-    }, [questions.length, currentIndex, pendingSongs, artist]);
+        preloadNext();
+    }, [gameState, questions.length, currentIndex, loadOneQuestion]);
 
     const handleGuess = useCallback((percentage) => {
         if (gameState !== 'playing') return;
@@ -237,17 +256,6 @@ export default function GamePage() {
         moveToNextQuestion();
     }, [moveToNextQuestion]);
 
-    // Auto-transition when question loads
-    useEffect(() => {
-        if (gameState === 'loading' && currentIndex < questions.length) {
-            questionKeyRef.current += 1;
-            setCurrentPhrase(questions[currentIndex].phrase);
-            setGuess(null);
-            setCountdown(COUNTDOWN_SECONDS);
-            setGameState('playing');
-        }
-    }, [gameState, currentIndex, questions]);
-
     if (!artist) return null;
 
     const currentQuestion = questions[currentIndex];
@@ -255,7 +263,7 @@ export default function GamePage() {
     const accuracy = lastResult && gameState === 'answered'
         ? getAccuracyLabel(lastResult.points)
         : null;
-    const totalQuestions = Math.max(questions.length, QUESTIONS_PER_ROUND);
+    const totalQuestions = QUESTIONS_PER_ROUND;
 
     return (
         <div className="page game-page">
