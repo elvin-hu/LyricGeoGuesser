@@ -29,10 +29,16 @@ export default function GamePage() {
     const usedSongsRef = useRef(new Set()); // Track used songs with ref to avoid stale state
     const pendingSongsRef = useRef([]); // Use ref for pending songs too
     const loadingPromiseRef = useRef(null); // Promise for concurrent loading
+    const resultsRef = useRef([]); // Track results with ref to avoid stale closure
 
     useEffect(() => {
         gameStateRef.current = gameState;
     }, [gameState]);
+
+    // Keep results ref in sync with state to avoid stale closures
+    useEffect(() => {
+        resultsRef.current = results;
+    }, [results]);
 
     const clearTimer = useCallback(() => {
         if (countdownRef.current) {
@@ -116,6 +122,7 @@ export default function GamePage() {
             usedSongsRef.current = new Set();
             pendingSongsRef.current = [...getRandomSongs(artistId, 25)]; // Get 25 songs
             loadingPromiseRef.current = null;
+            resultsRef.current = [];
 
             // Load first question
             const firstQuestion = await loadOneQuestion();
@@ -150,36 +157,20 @@ export default function GamePage() {
         }
     }, [gameState, startTimer, clearTimer]);
 
-    // Handle timeout state
-    useEffect(() => {
-        if (gameState !== 'timeout') return;
-
-        const question = questions[currentIndex];
-        if (!question) return;
-
-        setResults(prev => [...prev, {
-            song: question.song.title,
-            guess: null,
-            actual: question.phrase.percentage,
-            points: 0
-        }]);
-
-        moveToNextQuestion();
-    }, [gameState]);
-
     const moveToNextQuestion = useCallback(async () => {
         const nextIndex = currentIndex + 1;
 
         if (nextIndex >= QUESTIONS_PER_ROUND) {
-            // Game complete
+            // Game complete - use ref to get latest results
             setTimeout(() => {
-                const totalScore = results.reduce((sum, r) => sum + r.points, 0);
+                const currentResults = resultsRef.current;
+                const totalScore = currentResults.reduce((sum, r) => sum + r.points, 0);
                 navigate('/results', {
                     state: {
                         artistId,
                         artistName: artist.name,
                         score: totalScore,
-                        results: results
+                        results: currentResults
                     }
                 });
             }, 100);
@@ -202,26 +193,55 @@ export default function GamePage() {
             const nextQuestion = await loadOneQuestion();
 
             if (nextQuestion) {
-                setQuestions(prev => [...prev, nextQuestion]);
+                // Add question only if not already added (prevent race with preload)
+                setQuestions(prev => {
+                    if (prev.some(q => q.song.title === nextQuestion.song.title)) {
+                        return prev;
+                    }
+                    return [...prev, nextQuestion];
+                });
                 questionKeyRef.current += 1;
                 setCurrentPhrase(nextQuestion.phrase);
                 setGuess(null);
                 setCountdown(COUNTDOWN_SECONDS);
                 setGameState('playing');
             } else {
-                // No more songs available, end game early
-                const totalScore = results.reduce((sum, r) => sum + r.points, 0);
+                // No more songs available, end game early - use ref to get latest results
+                const currentResults = resultsRef.current;
+                const totalScore = currentResults.reduce((sum, r) => sum + r.points, 0);
                 navigate('/results', {
                     state: {
                         artistId,
                         artistName: artist.name,
                         score: totalScore,
-                        results: results
+                        results: currentResults
                     }
                 });
             }
         }
-    }, [currentIndex, questions, results, navigate, artistId, artist, loadOneQuestion]);
+    }, [currentIndex, questions, navigate, artistId, artist, loadOneQuestion]);
+
+    // Handle timeout state
+    useEffect(() => {
+        if (gameState !== 'timeout') return;
+
+        const question = questions[currentIndex];
+        if (!question) return;
+
+        // Add result for timeout
+        const timeoutResult = {
+            song: question.song.title,
+            guess: null,
+            actual: question.phrase.percentage,
+            points: 0
+        };
+        
+        setResults(prev => [...prev, timeoutResult]);
+        // Also update ref immediately so moveToNextQuestion has latest
+        resultsRef.current = [...resultsRef.current, timeoutResult];
+
+        moveToNextQuestion();
+    }, [gameState, questions, currentIndex, moveToNextQuestion]);
 
     // Preload next question while user is playing
     useEffect(() => {
@@ -253,13 +273,17 @@ export default function GamePage() {
         const actualPercentage = question.phrase.percentage;
         const points = calculatePoints(percentage, actualPercentage);
 
-        setGuess(percentage);
-        setResults(prev => [...prev, {
+        const newResult = {
             song: question.song.title,
             guess: percentage,
             actual: actualPercentage,
             points
-        }]);
+        };
+
+        setGuess(percentage);
+        setResults(prev => [...prev, newResult]);
+        // Also update ref immediately so moveToNextQuestion has latest
+        resultsRef.current = [...resultsRef.current, newResult];
         setGameState('answered');
     }, [gameState, questions, currentIndex, clearTimer]);
 
