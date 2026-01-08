@@ -30,6 +30,7 @@ export default function GamePage() {
     const pendingSongsRef = useRef([]); // Use ref for pending songs too
     const loadingPromiseRef = useRef(null); // Promise for concurrent loading
     const resultsRef = useRef([]); // Track results with ref to avoid stale closure
+    const initIdRef = useRef(0); // Track initialization to abort stale async operations
 
     useEffect(() => {
         gameStateRef.current = gameState;
@@ -117,6 +118,9 @@ export default function GamePage() {
             return;
         }
 
+        // Increment init ID to invalidate any in-progress initialization
+        const currentInitId = ++initIdRef.current;
+
         const initGame = async () => {
             // Reset refs
             usedSongsRef.current = new Set();
@@ -126,6 +130,11 @@ export default function GamePage() {
 
             // Load first question
             const firstQuestion = await loadOneQuestion();
+
+            // Check if this initialization is still valid (not superseded by a newer one)
+            if (currentInitId !== initIdRef.current) {
+                return; // Abort - a newer initialization has started
+            }
 
             if (!firstQuestion) {
                 navigate('/');
