@@ -173,14 +173,21 @@ export default function GamePage() {
             loadingPromiseRef.current = null;
             resultsRef.current = [];
 
-            // Aggressively prefetch first 6 songs in parallel while loading first question
-            const songsToPreload = pendingSongsRef.current.slice(0, 6);
-            console.log(`[initGame] Starting parallel prefetch of ${songsToPreload.length} songs`);
+            // Aggressively prefetch first 8 songs in parallel - AWAIT this to populate cache
+            const songsToPreload = pendingSongsRef.current.slice(0, 8);
+            console.log(`[initGame] Prefetching ${songsToPreload.length} songs in parallel...`);
+            const startTime = performance.now();
             
-            // Start prefetching in parallel (don't await - let it run in background)
-            prefetchSongsParallel(artist.name, songsToPreload);
+            // Await the parallel prefetch to populate cache before loading first question
+            await prefetchSongsParallel(artist.name, songsToPreload);
+            console.log(`[initGame] Prefetch complete in ${(performance.now() - startTime).toFixed(0)}ms`);
 
-            // Load first question (will use cache if prefetch completed first)
+            // Check if still active after await
+            if (!isActive || currentInitId !== initIdRef.current) {
+                return;
+            }
+
+            // Load first question (should hit cache now!)
             const firstQuestion = await loadOneQuestion();
 
             // Check if this initialization is still valid (not superseded by a newer one or cleaned up)
@@ -193,8 +200,8 @@ export default function GamePage() {
                 return;
             }
 
-            // Continue prefetching remaining songs in background
-            prefetchSongs(artist.name, pendingSongsRef.current.slice(6, 15));
+            // Continue prefetching remaining songs in background (don't await)
+            prefetchSongs(artist.name, pendingSongsRef.current.slice(0, 10));
 
             setQuestions([firstQuestion]);
             setCurrentPhrase(firstQuestion.phrase);
