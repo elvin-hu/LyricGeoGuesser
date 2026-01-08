@@ -178,14 +178,26 @@ export default function GamePage() {
         if (pendingSongs.length === 0) return;
 
         const loadNextQuestion = async () => {
+            // Get titles of songs already used
+            const usedTitles = new Set(questions.map(q => q.song.title));
+
             for (let i = 0; i < pendingSongs.length; i++) {
                 const song = pendingSongs[i];
+
+                // Skip if song already used
+                if (usedTitles.has(song.title)) {
+                    setPendingSongs(prev => prev.filter((_, idx) => idx !== i));
+                    continue;
+                }
+
                 const lyrics = await fetchLyrics(artist.name, song.title, song.album, song.duration);
 
                 if (lyrics) {
                     const phrase = selectRandomPhrase(lyrics);
                     if (phrase) {
                         setQuestions(prev => {
+                            // Double-check we haven't already added this song
+                            if (prev.some(q => q.song.title === song.title)) return prev;
                             if (prev.length >= QUESTIONS_PER_ROUND) return prev;
                             return [...prev, { song, phrase, lyrics }];
                         });
