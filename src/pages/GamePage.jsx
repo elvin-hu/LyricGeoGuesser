@@ -28,7 +28,7 @@ export default function GamePage() {
     const questionKeyRef = useRef(0);
     const usedSongsRef = useRef(new Set()); // Track used songs with ref to avoid stale state
     const pendingSongsRef = useRef([]); // Use ref for pending songs too
-    const isLoadingRef = useRef(false); // Prevent concurrent loading
+    const loadingPromiseRef = useRef(null); // Promise for concurrent loading
 
     useEffect(() => {
         gameStateRef.current = gameState;
@@ -63,34 +63,45 @@ export default function GamePage() {
 
     // Load a single question from pending songs
     const loadOneQuestion = useCallback(async () => {
-        if (isLoadingRef.current) return null;
-        isLoadingRef.current = true;
-
-        try {
-            while (pendingSongsRef.current.length > 0) {
-                const song = pendingSongsRef.current.shift(); // Take from front
-
-                // Skip if already used
-                if (usedSongsRef.current.has(song.title)) {
-                    continue;
-                }
-
-                const lyrics = await fetchLyrics(artist.name, song.title, song.album, song.duration);
-
-                if (lyrics) {
-                    const phrase = selectRandomPhrase(lyrics);
-                    if (phrase) {
-                        usedSongsRef.current.add(song.title); // Mark as used
-                        isLoadingRef.current = false;
-                        return { song, phrase, lyrics };
-                    }
-                }
-            }
-        } finally {
-            isLoadingRef.current = false;
+        // If already loading, wait for that request to finish
+        if (loadingPromiseRef.current) {
+            return loadingPromiseRef.current;
         }
 
-        return null;
+        const loadTask = async () => {
+            try {
+                while (pendingSongsRef.current.length > 0) {
+                    const song = pendingSongsRef.current.shift(); // Take from front
+
+                    // Skip if already used
+                    if (usedSongsRef.current.has(song.title)) {
+                        continue;
+                    }
+
+                    const lyrics = await fetchLyrics(artist.name, song.title, song.album, song.duration);
+
+                    if (lyrics) {
+                        const phrase = selectRandomPhrase(lyrics);
+                        if (phrase) {
+                            usedSongsRef.current.add(song.title); // Mark as used
+                            return { song, phrase, lyrics };
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Error loading question:", error);
+            }
+            return null;
+        };
+
+        loadingPromiseRef.current = loadTask();
+
+        try {
+            const result = await loadingPromiseRef.current;
+            return result;
+        } finally {
+            loadingPromiseRef.current = null;
+        }
     }, [artist]);
 
     // Initialize game
@@ -104,7 +115,7 @@ export default function GamePage() {
             // Reset refs
             usedSongsRef.current = new Set();
             pendingSongsRef.current = [...getRandomSongs(artistId, 25)]; // Get 25 songs
-            isLoadingRef.current = false;
+            loadingPromiseRef.current = null;
 
             // Load first question
             const firstQuestion = await loadOneQuestion();
