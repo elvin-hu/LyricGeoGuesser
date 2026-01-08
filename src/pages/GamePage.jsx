@@ -73,31 +73,53 @@ export default function GamePage() {
     const loadOneQuestion = useCallback(async () => {
         // If already loading, wait for that request to finish
         if (loadingPromiseRef.current) {
+            console.log('[loadOneQuestion] Waiting for existing load...');
             return loadingPromiseRef.current;
         }
 
         const loadTask = async () => {
+            const startTime = performance.now();
+            let attempts = 0;
+            
             try {
                 while (pendingSongsRef.current.length > 0) {
                     const song = pendingSongsRef.current.shift(); // Take from front
+                    attempts++;
 
                     // Skip if already used
                     if (usedSongsRef.current.has(song.title)) {
+                        console.log(`[loadOneQuestion] Skipping used song: ${song.title}`);
                         continue;
                     }
 
+                    console.log(`[loadOneQuestion] Trying: "${song.title}" (attempt ${attempts})`);
+                    const apiStart = performance.now();
                     const lyrics = await fetchLyrics(artist.name, song.title, song.album, song.duration);
+                    const apiTime = (performance.now() - apiStart).toFixed(0);
 
                     if (lyrics) {
                         const phrase = selectRandomPhrase(lyrics);
                         if (phrase) {
                             usedSongsRef.current.add(song.title); // Mark as used
+                            const totalTime = (performance.now() - startTime).toFixed(0);
+                            console.log(`[loadOneQuestion] ✓ Loaded "${song.title}" in ${totalTime}ms (API: ${apiTime}ms, ${attempts} attempts)`);
+                            
+                            // Integrity check
+                            if (!song.title || !phrase.text) {
+                                console.error('[loadOneQuestion] ⚠️ Missing data:', { title: song.title, phrase: phrase.text });
+                            }
+                            
                             return { song, phrase, lyrics };
+                        } else {
+                            console.log(`[loadOneQuestion] ✗ No valid phrase for "${song.title}" (API: ${apiTime}ms)`);
                         }
+                    } else {
+                        console.log(`[loadOneQuestion] ✗ No lyrics for "${song.title}" (API: ${apiTime}ms)`);
                     }
                 }
+                console.log(`[loadOneQuestion] Exhausted all ${attempts} songs`);
             } catch (error) {
-                console.error("Error loading question:", error);
+                console.error("[loadOneQuestion] Error:", error);
             }
             return null;
         };
@@ -322,6 +344,11 @@ export default function GamePage() {
         ? getAccuracyLabel(lastResult.points)
         : null;
     const totalQuestions = QUESTIONS_PER_ROUND;
+
+    // Debug: Log when we're about to render with missing data
+    if (gameState !== 'loading' && (!currentQuestion || !currentQuestion.song?.title)) {
+        console.warn(`[render] ⚠️ Missing question data! gameState=${gameState}, currentIndex=${currentIndex}, questions.length=${questions.length}`, currentQuestion);
+    }
 
     return (
         <div className="page game-page">

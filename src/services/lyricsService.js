@@ -59,9 +59,11 @@ export const fetchLyrics = async (artistName, trackName, albumName, duration) =>
     const cacheKey = `${artistName}-${trackName}`;
 
     if (lyricsCache.has(cacheKey)) {
+        console.log(`[fetchLyrics] Cache hit: "${trackName}"`);
         return lyricsCache.get(cacheKey);
     }
 
+    const startTime = performance.now();
     try {
         const params = new URLSearchParams({
             artist_name: artistName,
@@ -71,25 +73,31 @@ export const fetchLyrics = async (artistName, trackName, albumName, duration) =>
         });
 
         const response = await fetch(`${LRCLIB_API}/get?${params}`);
+        const fetchTime = (performance.now() - startTime).toFixed(0);
 
         if (!response.ok) {
+            console.log(`[fetchLyrics] ✗ "${trackName}" - HTTP ${response.status} (${fetchTime}ms)`);
             lyricsCache.set(cacheKey, null);
             return null;
         }
 
         const data = await response.json();
+        const totalTime = (performance.now() - startTime).toFixed(0);
 
         if (!data.syncedLyrics) {
+            console.log(`[fetchLyrics] ✗ "${trackName}" - No synced lyrics (${totalTime}ms)`);
             lyricsCache.set(cacheKey, null);
             return null;
         }
 
         const parsed = parseSyncedLyrics(data.syncedLyrics, duration);
+        console.log(`[fetchLyrics] ✓ "${trackName}" - ${parsed?.length || 0} lines (${totalTime}ms)`);
         lyricsCache.set(cacheKey, parsed);
 
         return parsed;
     } catch (error) {
-        console.error('Error fetching lyrics:', error);
+        const errorTime = (performance.now() - startTime).toFixed(0);
+        console.error(`[fetchLyrics] Error "${trackName}" (${errorTime}ms):`, error.message);
         lyricsCache.set(cacheKey, null);
         return null;
     }
