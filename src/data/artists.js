@@ -107,6 +107,19 @@ export const artists = [
     name: 'Sabrina Carpenter',
     image: 'https://ui-avatars.com/api/?name=Sabrina+Carpenter&background=EC4899&color=fff&size=200',
     songs: [
+      // Man's Best Friend (2025)
+      { title: 'Manchild', album: "Man's Best Friend", duration: 180 },
+      { title: 'Tears', album: "Man's Best Friend", duration: 195 },
+      { title: 'My Man on Willpower', album: "Man's Best Friend", duration: 200 },
+      { title: 'Sugar Talking', album: "Man's Best Friend", duration: 185 },
+      { title: 'We Almost Broke Up Again Last Night', album: "Man's Best Friend", duration: 210 },
+      { title: "Nobody's Son", album: "Man's Best Friend", duration: 190 },
+      { title: 'Never Getting Laid', album: "Man's Best Friend", duration: 205 },
+      { title: 'When Did You Get Hot?', album: "Man's Best Friend", duration: 188 },
+      { title: 'Go Go Juice', album: "Man's Best Friend", duration: 175 },
+      { title: "Don't Worry I'll Make You Worry", album: "Man's Best Friend", duration: 198 },
+      { title: 'House Tour', album: "Man's Best Friend", duration: 220 },
+      { title: 'Goodbye', album: "Man's Best Friend", duration: 215 },
       // Short n' Sweet (2024)
       { title: 'Espresso', album: "Short n' Sweet", duration: 175 },
       { title: 'Please Please Please', album: "Short n' Sweet", duration: 186 },
@@ -133,13 +146,6 @@ export const artists = [
       { title: 'tornado warnings', album: "emails i can't send", duration: 203 },
       { title: 'decode', album: "emails i can't send", duration: 189 },
       { title: 'opposite', album: "emails i can't send", duration: 186 },
-      // Singular Act II (2019)
-      { title: 'Skin', album: 'Singular Act II', duration: 193 },
-      { title: 'Looking at Me', album: 'Singular Act II', duration: 156 },
-      { title: 'In My Bed', album: 'Singular Act II', duration: 188 },
-      { title: 'Pushing 20', album: 'Singular Act II', duration: 194 },
-      { title: 'Exhale', album: 'Singular Act II', duration: 203 },
-      { title: 'Paris', album: 'Singular Act II', duration: 179 },
     ]
   }
 ];

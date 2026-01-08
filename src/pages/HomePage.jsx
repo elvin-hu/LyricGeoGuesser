@@ -47,7 +47,7 @@ export default function HomePage() {
                     transition={{ duration: 0.5 }}
                 >
                     <h1>Lyric GeoGuesser</h1>
-                    <p>Guess when lyrics appear in your favorite songs</p>
+                    <p>Guess when lyrics first appear in your favorite songs</p>
                 </motion.header>
 
                 <motion.div
