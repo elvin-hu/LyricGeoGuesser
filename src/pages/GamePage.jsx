@@ -41,6 +41,7 @@ export default function GamePage() {
         resultsRef.current = results;
     }, [results]);
 
+
     const clearTimer = useCallback(() => {
         if (countdownRef.current) {
             clearInterval(countdownRef.current);
@@ -118,6 +119,8 @@ export default function GamePage() {
             return;
         }
 
+        // Track if this effect instance is still active
+        let isActive = true;
         // Increment init ID to invalidate any in-progress initialization
         const currentInitId = ++initIdRef.current;
 
@@ -131,9 +134,9 @@ export default function GamePage() {
             // Load first question
             const firstQuestion = await loadOneQuestion();
 
-            // Check if this initialization is still valid (not superseded by a newer one)
-            if (currentInitId !== initIdRef.current) {
-                return; // Abort - a newer initialization has started
+            // Check if this initialization is still valid (not superseded by a newer one or cleaned up)
+            if (!isActive || currentInitId !== initIdRef.current) {
+                return; // Abort - effect was cleaned up or a newer initialization has started
             }
 
             if (!firstQuestion) {
@@ -154,7 +157,10 @@ export default function GamePage() {
 
         initGame();
 
-        return () => clearTimer();
+        return () => {
+            isActive = false; // Mark as inactive before cleanup
+            clearTimer();
+        };
     }, [artist, artistId, navigate, clearTimer, loadOneQuestion]);
 
     // Start/stop timer based on game state
@@ -258,19 +264,27 @@ export default function GamePage() {
         if (questions.length >= QUESTIONS_PER_ROUND) return;
         if (questions.length > currentIndex + 1) return; // Already have next question
 
+        let isActive = true;
+
         const preloadNext = async () => {
             const nextQuestion = await loadOneQuestion();
-            if (nextQuestion) {
-                setQuestions(prev => {
-                    // Check we haven't already added this
-                    if (prev.some(q => q.song.title === nextQuestion.song.title)) return prev;
-                    if (prev.length >= QUESTIONS_PER_ROUND) return prev;
-                    return [...prev, nextQuestion];
-                });
-            }
+            
+            // Check if effect is still active before updating state
+            if (!isActive || !nextQuestion) return;
+            
+            setQuestions(prev => {
+                // Check we haven't already added this
+                if (prev.some(q => q.song.title === nextQuestion.song.title)) return prev;
+                if (prev.length >= QUESTIONS_PER_ROUND) return prev;
+                return [...prev, nextQuestion];
+            });
         };
 
         preloadNext();
+
+        return () => {
+            isActive = false;
+        };
     }, [gameState, questions.length, currentIndex, loadOneQuestion]);
 
     const handleGuess = useCallback((percentage) => {
