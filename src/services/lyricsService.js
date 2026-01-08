@@ -9,6 +9,7 @@ const lyricsCache = new Map();
 // Prefetch queue for background loading
 const prefetchQueue = [];
 let isPrefetching = false;
+const PARALLEL_PREFETCH_COUNT = 3; // Fetch 3 songs in parallel
 
 /**
  * Parse LRC format timestamps to seconds
@@ -104,28 +105,54 @@ export const fetchLyrics = async (artistName, trackName, albumName, duration) =>
 };
 
 /**
- * Process prefetch queue in background
+ * Process prefetch queue in background - fetches multiple songs in parallel
  */
 const processPrefetchQueue = async () => {
     if (isPrefetching || prefetchQueue.length === 0) return;
 
     isPrefetching = true;
+    console.log(`[prefetch] Starting batch prefetch, ${prefetchQueue.length} songs queued`);
 
     while (prefetchQueue.length > 0) {
-        const { artistName, song, resolve } = prefetchQueue.shift();
-        const cacheKey = `${artistName}-${song.title}`;
-
-        if (!lyricsCache.has(cacheKey)) {
-            await fetchLyrics(artistName, song.title, song.album, song.duration);
+        // Take up to PARALLEL_PREFETCH_COUNT songs to fetch in parallel
+        const batch = [];
+        while (batch.length < PARALLEL_PREFETCH_COUNT && prefetchQueue.length > 0) {
+            const item = prefetchQueue.shift();
+            const cacheKey = `${item.artistName}-${item.song.title}`;
+            
+            // Skip if already cached
+            if (lyricsCache.has(cacheKey)) {
+                if (item.resolve) item.resolve();
+                continue;
+            }
+            
+            batch.push(item);
         }
 
-        if (resolve) resolve();
+        if (batch.length === 0) continue;
 
-        // Small delay to avoid hammering API
-        await new Promise(r => setTimeout(r, 100));
+        console.log(`[prefetch] Fetching batch of ${batch.length}: ${batch.map(b => b.song.title).join(', ')}`);
+        
+        // Fetch all songs in parallel
+        const results = await Promise.all(
+            batch.map(async ({ artistName, song, resolve }) => {
+                const lyrics = await fetchLyrics(artistName, song.title, song.album, song.duration);
+                if (resolve) resolve();
+                return { title: song.title, success: !!lyrics };
+            })
+        );
+
+        const successful = results.filter(r => r.success).length;
+        console.log(`[prefetch] Batch complete: ${successful}/${batch.length} successful`);
+
+        // Small delay between batches to avoid rate limiting
+        if (prefetchQueue.length > 0) {
+            await new Promise(r => setTimeout(r, 50));
+        }
     }
 
     isPrefetching = false;
+    console.log(`[prefetch] All prefetching complete`);
 };
 
 /**
@@ -141,6 +168,37 @@ export const prefetchSongs = (artistName, songs) => {
 
     // Start processing in background
     processPrefetchQueue();
+};
+
+/**
+ * Immediately prefetch multiple songs in parallel (not queued)
+ * Returns array of results with lyrics or null
+ */
+export const prefetchSongsParallel = async (artistName, songs) => {
+    const uncached = songs.filter(song => !lyricsCache.has(`${artistName}-${song.title}`));
+    
+    if (uncached.length === 0) {
+        console.log(`[prefetchParallel] All ${songs.length} songs already cached`);
+        return songs.map(song => ({
+            song,
+            lyrics: lyricsCache.get(`${artistName}-${song.title}`)
+        }));
+    }
+
+    console.log(`[prefetchParallel] Fetching ${uncached.length} songs in parallel...`);
+    const startTime = performance.now();
+
+    await Promise.all(
+        uncached.map(song => fetchLyrics(artistName, song.title, song.album, song.duration))
+    );
+
+    const totalTime = (performance.now() - startTime).toFixed(0);
+    console.log(`[prefetchParallel] Completed ${uncached.length} songs in ${totalTime}ms`);
+
+    return songs.map(song => ({
+        song,
+        lyrics: lyricsCache.get(`${artistName}-${song.title}`)
+    }));
 };
 
 /**

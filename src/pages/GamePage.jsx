@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getArtistById, getRandomSongs } from '../data/artists';
-import { fetchLyrics, selectRandomPhrase, prefetchSongs } from '../services/lyricsService';
+import { fetchLyrics, selectRandomPhrase, prefetchSongs, prefetchSongsParallel, getCachedLyrics } from '../services/lyricsService';
 import { calculatePoints, getAccuracyLabel } from '../services/scoreService';
 import ProgressBar from '../components/ProgressBar';
 import './GamePage.css';
@@ -82,6 +82,26 @@ export default function GamePage() {
             let attempts = 0;
             
             try {
+                // First pass: check for any cached songs (instant)
+                const pending = [...pendingSongsRef.current];
+                for (const song of pending) {
+                    if (usedSongsRef.current.has(song.title)) continue;
+                    
+                    const cachedLyrics = getCachedLyrics(artist.name, song.title);
+                    if (cachedLyrics) {
+                        const phrase = selectRandomPhrase(cachedLyrics);
+                        if (phrase) {
+                            // Remove from pending and mark as used
+                            const idx = pendingSongsRef.current.indexOf(song);
+                            if (idx > -1) pendingSongsRef.current.splice(idx, 1);
+                            usedSongsRef.current.add(song.title);
+                            console.log(`[loadOneQuestion] ✓ Cache hit: "${song.title}" (instant)`);
+                            return { song, phrase, lyrics: cachedLyrics };
+                        }
+                    }
+                }
+                
+                // Second pass: fetch from API
                 while (pendingSongsRef.current.length > 0) {
                     const song = pendingSongsRef.current.shift(); // Take from front
                     attempts++;
@@ -153,7 +173,14 @@ export default function GamePage() {
             loadingPromiseRef.current = null;
             resultsRef.current = [];
 
-            // Load first question
+            // Aggressively prefetch first 6 songs in parallel while loading first question
+            const songsToPreload = pendingSongsRef.current.slice(0, 6);
+            console.log(`[initGame] Starting parallel prefetch of ${songsToPreload.length} songs`);
+            
+            // Start prefetching in parallel (don't await - let it run in background)
+            prefetchSongsParallel(artist.name, songsToPreload);
+
+            // Load first question (will use cache if prefetch completed first)
             const firstQuestion = await loadOneQuestion();
 
             // Check if this initialization is still valid (not superseded by a newer one or cleaned up)
@@ -166,8 +193,8 @@ export default function GamePage() {
                 return;
             }
 
-            // Prefetch remaining songs in background
-            prefetchSongs(artist.name, pendingSongsRef.current.slice(0, 5));
+            // Continue prefetching remaining songs in background
+            prefetchSongs(artist.name, pendingSongsRef.current.slice(6, 15));
 
             setQuestions([firstQuestion]);
             setCurrentPhrase(firstQuestion.phrase);
@@ -280,29 +307,35 @@ export default function GamePage() {
         moveToNextQuestion();
     }, [gameState, questions, currentIndex, moveToNextQuestion]);
 
-    // Preload next question while user is playing
+    // Preload multiple questions ahead while user is playing
     useEffect(() => {
         if (gameState !== 'playing' && gameState !== 'answered') return;
         if (questions.length >= QUESTIONS_PER_ROUND) return;
-        if (questions.length > currentIndex + 1) return; // Already have next question
+        
+        // Preload up to 3 questions ahead
+        const questionsAhead = questions.length - currentIndex - 1;
+        if (questionsAhead >= 3) return; // Already have enough preloaded
 
         let isActive = true;
 
-        const preloadNext = async () => {
-            const nextQuestion = await loadOneQuestion();
-            
-            // Check if effect is still active before updating state
-            if (!isActive || !nextQuestion) return;
-            
-            setQuestions(prev => {
-                // Check we haven't already added this
-                if (prev.some(q => q.song.title === nextQuestion.song.title)) return prev;
-                if (prev.length >= QUESTIONS_PER_ROUND) return prev;
-                return [...prev, nextQuestion];
-            });
+        const preloadMultiple = async () => {
+            // Load up to 2 questions in this effect run
+            for (let i = 0; i < 2 && isActive; i++) {
+                const nextQuestion = await loadOneQuestion();
+                
+                // Check if effect is still active before updating state
+                if (!isActive || !nextQuestion) break;
+                
+                setQuestions(prev => {
+                    // Check we haven't already added this
+                    if (prev.some(q => q.song.title === nextQuestion.song.title)) return prev;
+                    if (prev.length >= QUESTIONS_PER_ROUND) return prev;
+                    return [...prev, nextQuestion];
+                });
+            }
         };
 
-        preloadNext();
+        preloadMultiple();
 
         return () => {
             isActive = false;
