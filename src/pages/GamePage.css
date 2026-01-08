@@ -1,0 +1,167 @@
+.game-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    background: var(--bg-primary);
+}
+
+.game-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-lg) var(--space-xl);
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: linear-gradient(to bottom, var(--bg-primary) 60%, transparent);
+}
+
+.back-btn {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: var(--radius-full);
+    transition: all var(--transition-fast);
+}
+
+.back-btn:hover {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+}
+
+.game-meta {
+    display: flex;
+    gap: var(--space-lg);
+    font-size: 0.9375rem;
+    font-weight: 500;
+}
+
+.question-count {
+    color: var(--text-tertiary);
+}
+
+.score-count {
+    color: var(--accent-light);
+}
+
+/* Loading */
+.loading-state {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.loader {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--bg-tertiary);
+    border-top-color: var(--text-tertiary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Question Content */
+.question-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 120px var(--space-xl) var(--space-3xl);
+    max-width: 640px;
+    margin: 0 auto;
+    width: 100%;
+    gap: var(--space-2xl);
+}
+
+.song-meta {
+    text-align: center;
+}
+
+.song-meta h2 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--space-xs);
+}
+
+.song-meta p {
+    font-size: 0.875rem;
+    color: var(--text-tertiary);
+}
+
+/* Lyric Quote */
+.lyric-quote {
+    font-size: clamp(1.75rem, 5vw, 2.5rem);
+    font-weight: 500;
+    line-height: 1.3;
+    text-align: center;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    max-width: 100%;
+    padding: 0 var(--space-md);
+    margin: 0;
+    border: none;
+}
+
+/* Result Feedback */
+.result-feedback {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-lg);
+}
+
+.feedback-score {
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.next-btn {
+    padding: var(--space-md) var(--space-2xl);
+    background: var(--text-primary);
+    color: var(--bg-primary);
+    border: none;
+    border-radius: var(--radius-full);
+    font-family: var(--font-system);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.next-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+@media (max-width: 640px) {
+    .game-header {
+        padding: var(--space-md) var(--space-lg);
+    }
+
+    .question-content {
+        padding: 100px var(--space-lg) var(--space-2xl);
+        gap: var(--space-xl);
+    }
+
+    .lyric-quote {
+        font-size: 1.5rem;
+    }
+}

@@ -1,0 +1,140 @@
+.progress-bar-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.progress-bar {
+    position: relative;
+    width: 100%;
+    height: 80px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.progress-bar.disabled {
+    cursor: default;
+}
+
+.progress-track {
+    position: relative;
+    width: 100%;
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.countdown-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: var(--radius-full);
+}
+
+/* Time endpoints - directly below track */
+.time-endpoints {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    margin-top: var(--space-sm);
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Hover indicator */
+.hover-indicator {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.hover-line {
+    width: 2px;
+    height: 32px;
+    background: var(--text-primary);
+    border-radius: 1px;
+    opacity: 0.5;
+}
+
+.hover-time {
+    margin-top: 4px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Markers */
+.marker {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.marker-line {
+    width: 3px;
+    height: 40px;
+    background: var(--text-primary);
+    border-radius: 2px;
+}
+
+.actual-line {
+    background: var(--success);
+}
+
+.marker-time {
+    margin-top: 4px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.actual-time {
+    color: var(--success);
+}
+
+/* Countdown display */
+.countdown-display {
+    font-size: 0.875rem;
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Interactive hover effect */
+.progress-bar:not(.disabled):hover .progress-track {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 640px) {
+    .progress-bar {
+        height: 90px;
+    }
+
+    .progress-track {
+        height: 8px;
+    }
+
+    .marker-line,
+    .hover-line {
+        height: 48px;
+    }
+}

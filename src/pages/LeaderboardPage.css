@@ -1,0 +1,192 @@
+.leaderboard-page {
+    padding: var(--space-3xl) var(--space-xl);
+    gap: var(--space-2xl);
+}
+
+.leaderboard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 480px;
+}
+
+.leaderboard-header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+}
+
+/* Empty State */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-lg);
+    padding: var(--space-3xl);
+    text-align: center;
+}
+
+.empty-emoji {
+    font-size: 3rem;
+}
+
+.empty-state h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.empty-state p {
+    color: var(--text-secondary);
+}
+
+/* Sections */
+.section {
+    width: 100%;
+    max-width: 480px;
+}
+
+.section-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--space-md);
+}
+
+/* Score Cards */
+.scores-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.score-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg-secondary);
+}
+
+.rank {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    width: 28px;
+}
+
+.artist-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.artist-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.score-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.score-artist {
+    font-weight: 500;
+    margin-bottom: 2px;
+}
+
+.score-stars {
+    font-size: 0.8125rem;
+}
+
+.score-value {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+
+.play-btn {
+    background: var(--bg-elevated);
+    border: none;
+    color: var(--text-primary);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-full);
+    font-family: var(--font-system);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+.play-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* Recent Games */
+.recent-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.recent-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-md) var(--space-lg);
+    font-size: 0.9375rem;
+    background: var(--bg-secondary);
+}
+
+.recent-artist {
+    flex: 1;
+    color: var(--text-primary);
+}
+
+.recent-score {
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+.recent-date {
+    color: var(--text-tertiary);
+    font-size: 0.8125rem;
+}
+
+.back-btn {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: var(--radius-full);
+    transition: all var(--transition-fast);
+}
+
+.back-btn:hover {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+}
+
+@media (max-width: 640px) {
+    .leaderboard-page {
+        padding: var(--space-2xl) var(--space-lg);
+    }
+}
